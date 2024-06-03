@@ -1,0 +1,56 @@
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+driver = webdriver.Chrome()
+wait = WebDriverWait(driver, 10)
+
+def add_product_to_basket(product_index, quantity):
+    for i in range(quantity):
+        add_button = wait.until(EC.element_to_be_clickable((By.XPATH, f"(//button[text()='Add to Basket'])[{product_index}]")))
+        add_button.click()
+
+def main():
+    driver.get('https://sweetshop.netlify.app/')
+
+    # Add different quantities of 4 products
+    products = [{'index': 1, 'quantity': 2}, {'index': 2, 'quantity': 1}, {'index': 3, 'quantity': 3}, {'index': 4, 'quantity': 1}]
+    for product in products:
+        add_product_to_basket(product['index'], product['quantity'])
+
+    # Go to basket page
+    basket_link = wait.until(EC.element_to_be_clickable((By.LINK_TEXT, 'Basket')))
+    basket_link.click()
+
+    # Verify all selected items are present in basket
+    for i, product in enumerate(products, start=1):
+        basket_quantity = wait.until(EC.visibility_of_element_located((By.XPATH, f"(//input[@type='number'])[{i}]"))).get_attribute('value')
+        assert int(basket_quantity) == product['quantity']
+
+    # Verify total price
+    prices = [3.00, 1.50, 2.00, 2.50]
+    total_price = sum(p['quantity'] * prices[i] for i, p in enumerate(products))
+    basket_total = wait.until(EC.visibility_of_element_located((By.XPATH, "//h3[contains(text(),'Total:')]/span"))).text
+    assert float(basket_total) == total_price
+
+    # Change to Standard Shipping and verify total price
+    standard_shipping = wait.until(EC.element_to_be_clickable((By.XPATH, "//input[@value='standard']")))
+    standard_shipping.click()
+    shipping_cost = 2.50
+    new_total_price = total_price + shipping_cost
+    basket_total = wait.until(EC.visibility_of_element_located((By.XPATH, "//h3[contains(text(),'Total:')]/span"))).text
+    assert float(basket_total) == new_total_price
+
+    # Fill details and checkout
+    driver.find_element(By.NAME, 'name').send_keys('John Doe')
+    driver.find_element(By.NAME, 'address').send_keys('123 Elm Street')
+    driver.find_element(By.NAME, 'card').send_keys('4111111111111111')
+    checkout_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[text()='Checkout']")))
+    checkout_button.click()
+
+    # Verify checkout success
+    success_message = wait.until(EC.visibility_of_element_located((By.XPATH, "//h2[text()='Order placed successfully!']")))
+    assert success_message.is_displayed()
+
+    driver.quit()
